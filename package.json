@@ -1,0 +1,47 @@
+{
+  "name": "excel-datamashup",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "types/index.d.ts",
+  "scripts": {
+    "build": "vite build",
+    "prestart": "npm run build",
+    "start": "node dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "base64-js": "^1.5.1",
+    "binary-parser": "^2.2.1",
+    "buffer": "^6.0.3",
+    "fflate": "^0.8.2",
+    "web-streams-polyfill": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/base64-js": "^1.3.2",
+    "@types/binary-parser": "^1.5.5",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.3"
+  },
+  "prettier": {
+    "trailingComma": "es5",
+    "tabWidth": 4,
+    "semi": true,
+    "singleQuote": true,
+    "arrowParens": "always",
+    "endOfLine": "crlf",
+    "overrides": [
+      {
+        "files": [
+          "*.json"
+        ],
+        "options": {
+          "tabWidth": 2
+        }
+      }
+    ]
+  }
+}
