@@ -1,7 +1,7 @@
 {
   "name": "excel-datamashup",
   "version": "1.0.0",
-  "description": "",
+  "description": "Read and edit the Power Query formula in Excel documents.",
   "type": "module",
   "main": "dist/index.js",
   "types": "types/index.d.ts",
@@ -10,9 +10,16 @@
     "prestart": "npm run build",
     "start": "node dist/index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Alex Pedersen",
+  "license": "SEE LICENSE IN LICENSE",
+  "bugs": {
+    "url": "https://github.com/Vladinator/excel-datamashup/issues"
+  },
+  "homepage": "https://github.com/Vladinator/excel-datamashup",
+  "keywords": [
+    "excel",
+    "power query"
+  ],
   "dependencies": {
     "base64-js": "^1.5.1",
     "binary-parser": "^2.2.1",
