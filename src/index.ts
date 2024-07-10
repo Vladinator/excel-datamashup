@@ -1,3 +1,5 @@
+export * from '../types';
+
 import { ParseXml } from './datamashup';
 
 /* uncomment block then build for demo-purposes
