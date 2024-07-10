@@ -10,10 +10,32 @@ This binary format can be processed into something we can read, edit, then re-pa
 
 The goal of this project is to faciliate processing a Excel file, then being able to edit and save it in both browser and node.
 
-## Building
+## API
 
-1. `npm i`
-2. `npm start`
+```ts
+import { ParseXml } from 'excel-datamashup';
+
+// extract the contents of `customXml\item1.xml` using your favorite zip editing library
+const xml = `...`;
+
+// returns `ParseResult` object or a string corresponding to the `ParseError` type
+const result = await ParseXml(xml);
+
+// the object has some helper methods along with the raw data for manipulation
+const originalFormula = result.getFormula();
+
+// edit the original or create a entirely new power query
+const newFormula = `...`;
+
+// replace the formula with your new one
+result.setFormula(newFormula);
+
+// always reset permissions when editing
+result.resetPermissions();
+
+// update the contents of `customXml\item1.xml` by writing this new content using your favorite zip editing library
+const newXml = await result.save();
+```
 
 ## Sample
 
