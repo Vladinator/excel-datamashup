@@ -1,4 +1,5 @@
-import type { UnzippedItem } from '../types';
+import type { UnzippedItem } from '../types/index.d';
+
 import { Buffer } from './buffer';
 import { ReadableStream } from './stream';
 import { Zippable, unzip, zip } from 'fflate';

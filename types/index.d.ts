@@ -1,2 +1,2 @@
-export * from './datamashup';
-export * from './zip';
+export * from './datamashup.d';
+export * from './zip.d';

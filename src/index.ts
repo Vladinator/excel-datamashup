@@ -1,4 +1,4 @@
-export * from '../types';
+export * from '../types/index.d';
 
 import { ParseXml } from './datamashup';
 

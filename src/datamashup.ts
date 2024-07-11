@@ -1,4 +1,10 @@
-import type { ParseError, UnzippedItem, Metadata, ParseResult } from '../types';
+import type {
+    ParseError,
+    UnzippedItem,
+    Metadata,
+    ParseResult,
+} from '../types/index.d';
+
 import base64 from 'base64-js';
 import { Parser } from 'binary-parser';
 import { Buffer } from './buffer';
