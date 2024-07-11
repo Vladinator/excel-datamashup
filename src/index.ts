@@ -1,5 +1,10 @@
 export * from '../types/index.d';
 
+export * from './buffer';
+export * from './stream';
+export * from './text';
+export * from './zip';
+
 import { ParseXml } from './datamashup';
 
 /* uncomment block then build for demo-purposes

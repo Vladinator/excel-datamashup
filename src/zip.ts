@@ -27,9 +27,7 @@ const unzipChunks = (
     });
 };
 
-export const unzipData = (
-    data: number[] | Uint8Array
-): Promise<UnzippedItem[]> => {
+export const Unzip = (data: number[] | Uint8Array): Promise<UnzippedItem[]> => {
     const buffer = data instanceof Uint8Array ? data : Uint8Array.from(data);
     const stream = ReadableStream.from(buffer);
     const reader = stream.getReader();
@@ -45,7 +43,7 @@ export const unzipData = (
     });
 };
 
-export const zipItems = (items: UnzippedItem[]): Promise<Buffer> => {
+export const Zip = (items: UnzippedItem[]): Promise<Buffer> => {
     return new Promise((resolve) => {
         const zippable: Zippable = {};
         for (const item of items) {

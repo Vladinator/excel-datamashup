@@ -1,6 +1,6 @@
 {
   "name": "excel-datamashup",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Read and edit the Power Query formula in Excel documents.",
   "type": "module",
   "main": "src/index.ts",

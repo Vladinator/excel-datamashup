@@ -10,7 +10,7 @@ import { Parser } from 'binary-parser';
 import { Buffer } from './buffer';
 import { crypto } from './crypto';
 import { Decoder, Encoder } from './text';
-import { unzipData, zipItems } from './zip';
+import { Unzip, Zip } from './zip';
 
 const ParserRoot = new Parser()
     .endianness('little')
@@ -80,7 +80,7 @@ export const ParseXml = async (
     const rootData = ParserRoot.parse(binaryBuffer);
     if (!rootData) return 'ParseRootError';
 
-    const packageItems = await unzipData(rootData.packageParts);
+    const packageItems = await Unzip(rootData.packageParts);
 
     const packageParts = packageItems.map(ConvertUnzippedItemXmlToString);
 
@@ -94,7 +94,7 @@ export const ParseXml = async (
         ConvertToBuffer(metadataData.metadataXml)
     );
 
-    const metadataContentItems = await unzipData(metadataData.content);
+    const metadataContentItems = await Unzip(metadataData.content);
 
     const metadata: Metadata = {
         version: metadataData.version,
@@ -365,7 +365,7 @@ export const ParseXml = async (
         const { version, metadata, content } = result.metadata;
         appendBufferInt32LE(buffers, version);
         await appendBufferLenLE(buffers, Buffer.from(metadata));
-        await appendBufferLenLE(buffers, await zipItems(content));
+        await appendBufferLenLE(buffers, await Zip(content));
         const buffer = Buffer.concat(buffers);
         appendBufferInt32LE(parentBuffers, buffer.length);
         appendBuffer(parentBuffers, buffer);
@@ -376,7 +376,7 @@ export const ParseXml = async (
         const { version, packageParts, permissions, permissionBindings } =
             result;
         appendBufferInt32LE(buffers, version);
-        await appendBufferLenLE(buffers, await zipItems(packageParts));
+        await appendBufferLenLE(buffers, await Zip(packageParts));
         await appendBufferLenLE(buffers, Buffer.from(permissions));
         await appendMetadataBufferLE(buffers);
         await appendBufferLenLE(buffers, Buffer.from(permissionBindings)); // TODO

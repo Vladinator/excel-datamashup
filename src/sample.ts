@@ -1,7 +1,7 @@
 import type { UnzippedItem } from '../types';
 import { Buffer } from './buffer';
 import { TextDecoder, EncodeUTF16LE } from './text';
-import { unzipData, zipItems } from './zip';
+import { Unzip, Zip } from './zip';
 import demoXml from '../sample/demo.json';
 
 const demoXmlPromise: Promise<string> = Promise.resolve(demoXml);
@@ -64,7 +64,7 @@ const requestFile = (): Promise<string> | undefined => {
         function extract(arrayBuffer: ArrayBuffer): void {
             const decoder = new TextDecoder('utf-16le');
             const buffer = new Uint8Array(arrayBuffer);
-            unzipData(buffer)
+            Unzip(buffer)
                 .then((items) => {
                     const item = items.find(
                         (item) => item.path === 'customXml/item1.xml'
@@ -107,7 +107,7 @@ const saveFile = (xml: string): Promise<boolean> | undefined => {
     if (!file || !zipFiles || !zipFile) return;
     zipFile.data = EncodeUTF16LE(xml);
     return new Promise((resolve) => {
-        zipItems(zipFiles)
+        Zip(zipFiles)
             .then((buffer) => {
                 try {
                     downloadFile(buffer, file.type, `Modified ${file.name}`);
