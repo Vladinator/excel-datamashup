@@ -1,15 +1,14 @@
-import type { UnzippedItem } from '../types';
+import type { UnzippedExcel } from '../types';
 import { Buffer } from './buffer';
-import { TextDecoder, EncodeUTF16LE } from './text';
-import { Unzip, Zip } from './zip';
+import { Encoder } from './text';
+import { ExcelZip } from './zip';
 import demoXml from '../sample/demo.json';
 
 const demoXmlPromise: Promise<string> = Promise.resolve(demoXml);
 
 const userFile: {
     file?: File;
-    zipFiles?: UnzippedItem[];
-    zipFile?: UnzippedItem;
+    excelZip?: UnzippedExcel;
 } = {};
 
 const requestFile = (): Promise<string> | undefined => {
@@ -26,9 +25,10 @@ const requestFile = (): Promise<string> | undefined => {
         document.body.appendChild(input);
         input.click();
         document.body.removeChild(input);
-        function output(data?: string): void {
-            if (data && data.length) {
-                resolve(data);
+        function output(result?: UnzippedExcel): void {
+            userFile.excelZip = result;
+            if (result && result.datamashup) {
+                resolve(result.datamashup.xml);
             } else {
                 resolve(demoXmlPromise);
             }
@@ -44,9 +44,7 @@ const requestFile = (): Promise<string> | undefined => {
             const reader = new FileReader();
             reader.addEventListener('load', (event) => {
                 const result = event.target?.result;
-                if (typeof result === 'string') {
-                    output(result);
-                } else if (result) {
+                if (result) {
                     extract(result);
                 } else {
                     output();
@@ -61,25 +59,14 @@ const requestFile = (): Promise<string> | undefined => {
             });
             reader.readAsArrayBuffer(userFile.file);
         }
-        function extract(arrayBuffer: ArrayBuffer): void {
-            const decoder = new TextDecoder('utf-16le');
-            const buffer = new Uint8Array(arrayBuffer);
-            Unzip(buffer)
-                .then((items) => {
-                    const item = items.find(
-                        (item) => item.path === 'customXml/item1.xml'
-                    );
-                    if (item) {
-                        const data =
-                            typeof item.data === 'string'
-                                ? item.data
-                                : decoder.decode(item.data);
-                        userFile.zipFiles = items;
-                        userFile.zipFile = item;
-                        output(data);
-                    } else {
-                        output();
-                    }
+        function extract(data: string | ArrayBuffer): void {
+            const buffer =
+                typeof data === 'string'
+                    ? Encoder.encode(data)
+                    : new Uint8Array(data);
+            ExcelZip(buffer)
+                .then((result) => {
+                    output(result);
                 })
                 .catch((err) => {
                     console.error(err);
@@ -101,13 +88,15 @@ const downloadFile = (buffer: Buffer, type: string, name: string): void => {
     URL.revokeObjectURL(url);
 };
 
-const saveFile = (xml: string): Promise<boolean> | undefined => {
+const saveExcelZip = (
+    excelZip: UnzippedExcel
+): Promise<boolean> | undefined => {
     if (typeof document === 'undefined') return;
-    const { file, zipFiles, zipFile } = userFile;
-    if (!file || !zipFiles || !zipFile) return;
-    zipFile.data = EncodeUTF16LE(xml);
+    const { file } = userFile;
+    if (!file) return;
     return new Promise((resolve) => {
-        Zip(zipFiles)
+        excelZip
+            .save()
             .then((buffer) => {
                 try {
                     downloadFile(buffer, file.type, `Modified ${file.name}`);
@@ -124,10 +113,28 @@ const saveFile = (xml: string): Promise<boolean> | undefined => {
     });
 };
 
+const saveFile = (xml: string): Promise<boolean> | undefined => {
+    if (typeof document === 'undefined') return;
+    const { file, excelZip } = userFile;
+    if (!file || !excelZip) return;
+    excelZip.setFormula(xml);
+    return saveExcelZip(excelZip);
+};
+
 export const getSampleXml = (): Promise<string> => {
     const promise: Promise<string> | undefined = requestFile();
     if (promise) return promise;
     return demoXmlPromise;
+};
+
+export const getSampleExcelZip = (): UnzippedExcel | undefined => {
+    return userFile.excelZip;
+};
+
+export const saveSampleExcelZip = async (
+    excelZip: UnzippedExcel
+): Promise<void> => {
+    await saveExcelZip(excelZip);
 };
 
 export const saveSampleXml = async (xml: string): Promise<void> => {

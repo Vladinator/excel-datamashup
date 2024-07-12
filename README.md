@@ -8,9 +8,36 @@ The contents will in situations where Power Query is used, contain a customXml f
 
 This binary format can be processed into something we can read, edit, then re-package back into binary format.
 
-The goal of this project is to faciliate processing a Excel file, then being able to edit and save it in both browser and node.
+The goal of this project is to faciliate processing a Excel file, then being able to edit and save it in both browser and terminal modes.
 
 ## API
+
+You can work with the library in either ExcelZip mode which provides a certain level of wrapper for you.
+
+```ts
+import { type UnzippedExcel, ExcelZip } from 'excel-datamashup';
+
+// read and store the binary zip data as number array, Uint8Array or Buffer
+const zip = new Uint8Array();
+
+// process the zip into a more manageable object
+const excelZip: UnzippedExcel = await ExcelZip(zip);
+
+// the object has some helper methods along with the raw data for manipulation
+const originalFormula = excelZip.getFormula();
+
+// modify or replace the formula entirely
+const newFormula = originalFormula.replace('"Some Text"', '"New Text"');
+
+// replace the formula with your new one
+// this method will also call the internal `excelZip.datamashup.result.resetPermissions()` method for you
+excelZip.setFormula(newFormula);
+
+// zip the contents back to an Excel file
+const newZip: Buffer = await excelZip.save();
+```
+
+The more direct approach is to simply focus on processing the DataMashup XML file directly.
 
 ```ts
 import { ParseXml } from 'excel-datamashup';
@@ -77,5 +104,5 @@ Remove-Item -Path $tempFile
 
 ## Resources
 
-- https://bengribaudo.com/blog/2020/04/22/5198/data-mashup-binary-stream
-- https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-qdeff/27b1dd1e-7de8-45d9-9c84-dfcc7a802e37
+-   https://bengribaudo.com/blog/2020/04/22/5198/data-mashup-binary-stream
+-   https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-qdeff/27b1dd1e-7de8-45d9-9c84-dfcc7a802e37

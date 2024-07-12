@@ -275,20 +275,10 @@ export const ParseXml = async (
 
     // */
 
-    const getFormulaFile = (): UnzippedItem => {
-        let item = result.packageParts.find((item) =>
+    const getFormulaFile = (): UnzippedItem | undefined => {
+        return result.packageParts.find((item) =>
             item.path.includes(FormulaSectionDefault)
         );
-        if (!item) {
-            item = {
-                path: FormulaSectionDefault,
-                size: 0,
-                type: 'File',
-                data: '',
-            };
-            result.packageParts.push(item);
-        }
-        return item;
     };
 
     const appendBufferInt32LE = (buffers: Buffer[], value: number): void => {
@@ -335,13 +325,15 @@ export const ParseXml = async (
 
     return result;
 
-    function getFormula(): string {
+    function getFormula(): string | undefined {
         const item = getFormulaFile();
+        if (!item) return;
         return item.data as string;
     }
 
     function setFormula(formula: string): void {
         const item = getFormulaFile();
+        if (!item) return;
         item.size = formula.length;
         item.data = formula;
     }

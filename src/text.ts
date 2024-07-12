@@ -16,6 +16,8 @@ const Encoder = new TextEncoderImpl();
 
 const Decoder = new TextDecoderImpl('utf-8');
 
+const DecoderUTF16LE = new TextDecoder('utf-16le');
+
 const EncodeUTF16LE = (data: string | Uint8Array | Buffer): Buffer => {
     const str = typeof data === 'string' ? data : Decoder.decode(data);
     const length = str.length;
@@ -36,5 +38,6 @@ export {
     TextEncoderImpl as TextEncoder,
     Encoder,
     Decoder,
+    DecoderUTF16LE,
     EncodeUTF16LE,
 };

@@ -18,7 +18,7 @@ export type ParseResult = {
     metadata: Metadata;
     permissionBindings: number[];
     setFormula: (formula: string) => void;
-    getFormula: () => string;
+    getFormula: () => string | undefined;
     resetPermissions: () => void;
     save: () => Promise<string>;
 };
