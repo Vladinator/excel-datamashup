@@ -24,10 +24,10 @@ const zip = new Uint8Array();
 const excelZip: UnzippedExcel = await ExcelZip(zip);
 
 // the object has some helper methods along with the raw data for manipulation
-const originalFormula = excelZip.getFormula();
+const originalFormula: string = excelZip.getFormula();
 
 // modify or replace the formula entirely
-const newFormula = originalFormula.replace('"Some Text"', '"New Text"');
+const newFormula: string = originalFormula.replace('"Some Text"', '"New Text"');
 
 // replace the formula with your new one
 // this method will also call the internal `excelZip.datamashup.result.resetPermissions()` method for you
@@ -43,16 +43,16 @@ The more direct approach is to simply focus on processing the DataMashup XML fil
 import { ParseXml } from 'excel-datamashup';
 
 // extract the contents of `customXml\item1.xml` using your favorite zip editing library
-const xml = `...`;
+const xml: string = `...`;
 
 // returns `ParseResult` object or a string corresponding to the `ParseError` type
-const result = await ParseXml(xml);
+const result: ParseResult = await ParseXml(xml);
 
 // the object has some helper methods along with the raw data for manipulation
-const originalFormula = result.getFormula();
+const originalFormula: string = result.getFormula();
 
 // edit the original or create a entirely new power query
-const newFormula = `...`;
+const newFormula: string = `...`;
 
 // replace the formula with your new one
 result.setFormula(newFormula);
@@ -61,14 +61,19 @@ result.setFormula(newFormula);
 result.resetPermissions();
 
 // update the contents of `customXml\item1.xml` by writing this new content using your favorite zip editing library
-const newXml = await result.save();
+const newXml: string = await result.save();
 ```
 
 ## Sample
 
-The sample folder contain an example. It contains a Power Query that simply outputs a table with some text.
+The sample folder contain an example file that contains a Power Query. It simply outputs text to a table.
 
-If you want to test using your own Excel file you can use the following PowerShell snippet:
+If you have this project checked out, simply uncomment the `src\index.ts` line 10 to enable the demo behavior.
+
+Build the project and run `dist\index.js` in a browser, it will ask for you to upload a Excel file, which it will edit then download.
+
+<details>
+  <summary>If you want to test using your own Excel file you can use the following PowerShell snippet to have it update `sample\excel.json` with your own Power Query.</summary>
 
 ```pwsh
 $inputFile = ".\sample\demo.xlsb"
@@ -101,6 +106,7 @@ try {
 (Get-Content -Path $tempFile) -join "" | ConvertTo-Json -Compress | Set-Content -Path $outputFile
 Remove-Item -Path $tempFile
 ```
+</details>
 
 ## Resources
 

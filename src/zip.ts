@@ -6,6 +6,12 @@ import { ReadableStream } from './stream';
 import { DecoderUTF16LE, EncodeUTF16LE } from './text';
 import { Zippable, unzip, zip } from 'fflate';
 
+/**
+ * Converts chunks into a buffer, then runs unzip on the whole file.
+ *
+ * @param chunks Partial chunks of data.
+ * @param resolve Callback when the unzip finishes processing.
+ */
 const unzipChunks = (
     chunks: number[],
     resolve: (items: UnzippedItem[]) => void
@@ -29,6 +35,12 @@ const unzipChunks = (
     });
 };
 
+/**
+ * Unzip a ZIP by passing its binary data, and having its internal files and folders returned in an array.
+ *
+ * @param data The ZIP data.
+ * @returns Array of `UnzippedItem`.
+ */
 export const Unzip = (
     data: number[] | Uint8Array | Buffer
 ): Promise<UnzippedItem[]> => {
@@ -47,6 +59,12 @@ export const Unzip = (
     });
 };
 
+/**
+ * Zip an array of `UnzippedItem` into a ZIP binary buffer.
+ *
+ * @param items The files and folders as `UnzippedItem` array that you wish to ZIP up.
+ * @returns The ZIP data as `Buffer`.
+ */
 export const Zip = (items: UnzippedItem[]): Promise<Buffer> => {
     return new Promise((resolve) => {
         const zippable: Zippable = {};
@@ -69,9 +87,26 @@ export const Zip = (items: UnzippedItem[]): Promise<Buffer> => {
     });
 };
 
+/**
+ * The string that signifies the DataMashup XML tag.
+ *
+ * This is a `UTF-8` encoded string.
+ */
 const DataMashupText = '<DataMashup ';
+
+/**
+ * The string that signifies the DataMashup XML tag.
+ *
+ * This is a `UTF-16LE` encoded string `Buffer`.
+ */
 const DataMashupTextAsBuffer = EncodeUTF16LE(DataMashupText);
 
+/**
+ * Find the DataMashup file from an array of files.
+ *
+ * @param files The files in the ZIP.
+ * @returns `UnzippedItem` if the DataMashup file was found, otherwise `undefined`.
+ */
 const findDataMashupFile = (
     files: UnzippedItem[]
 ): UnzippedItem | undefined => {
@@ -91,6 +126,12 @@ const findDataMashupFile = (
     });
 };
 
+/**
+ * Convert Excel data into `UnzippedExcel` object.
+ *
+ * @param data The ZIP data.
+ * @returns `UnzippedExcel` containing data and helper methods.
+ */
 export const ExcelZip = async (
     data: number[] | Uint8Array | Buffer
 ): Promise<UnzippedExcel> => {
@@ -122,6 +163,11 @@ export const ExcelZip = async (
         };
     }
     return results;
+    /**
+     * Get the Power Query formula.
+     *
+     * @returns `string` if found, otherwise `undefined`.
+     */
     function getFormula(): string | undefined {
         const { datamashup } = results;
         if (!datamashup || datamashup.error) {
@@ -129,6 +175,14 @@ export const ExcelZip = async (
         }
         return datamashup.result.getFormula();
     }
+    /**
+     * Set the Power Query formula.
+     *
+     * This also calls `resetPermissions` for you as required.
+     *
+     * @param formula The Power Query formula to be stored in the `Section1.m` file.
+     * @returns
+     */
     function setFormula(formula: string): void {
         const { datamashup } = results;
         if (!datamashup || datamashup.error) {
@@ -138,6 +192,11 @@ export const ExcelZip = async (
         result.setFormula(formula);
         result.resetPermissions();
     }
+    /**
+     * Save the session back into an Excel file.
+     *
+     * @returns `Buffer` of the Excel file.
+     */
     async function save(): Promise<Buffer> {
         const { datamashup } = results;
         if (!datamashup || datamashup.error) {
