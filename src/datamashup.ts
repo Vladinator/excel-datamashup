@@ -1,15 +1,10 @@
-import type {
-    ParseError,
-    UnzippedItem,
-    Metadata,
-    ParseResult,
-} from '../types/index.d';
-
+import type { ParseError, UnzippedItem, Metadata, ParseResult } from './types';
 import base64 from 'base64-js';
 import { Parser } from 'binary-parser';
 import { Buffer } from './buffer';
-import { crypto } from './crypto';
-import { Decoder, Encoder } from './text';
+// import { crypto } from './crypto';
+// import { Decoder, Encoder } from './text';
+import { Decoder } from './text';
 import { Unzip, Zip } from './zip';
 
 /**
@@ -156,14 +151,16 @@ export const ParseXml = async (
 
     const packageParts = packageItems.map(ConvertUnzippedItemXmlToString);
 
-    const permissions = Decoder.decode(ConvertToBuffer(rootData.permissions));
+    const permissions = Decoder.decode(
+        ConvertToBuffer(rootData.permissions) as never
+    );
 
     const metadataData = ParserMetadata.parse(
-        ConvertToBuffer(rootData.metadata)
+        ConvertToBuffer(rootData.metadata) as never
     );
 
     const metadataXml = Decoder.decode(
-        ConvertToBuffer(metadataData.metadataXml)
+        ConvertToBuffer(metadataData.metadataXml) as never
     );
 
     const metadataContentItems = await Unzip(metadataData.content);

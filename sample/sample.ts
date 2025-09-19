@@ -1,8 +1,9 @@
 import type { UnzippedExcel } from '../types';
-import { Buffer } from './buffer';
-import { Encoder } from './text';
-import { ExcelZip } from './zip';
-import demoXml from '../sample/demo.json';
+import { Buffer } from '../src/buffer';
+import { Encoder } from '../src/text';
+import { ExcelZip } from '../src/zip';
+import { ParseXml } from '../src/datamashup';
+import demoXml from './demo.json';
 
 /**
  * The `demo.json` data as a `Promise<string>` instance.
@@ -19,7 +20,7 @@ const userFile: {
 
 /**
  * Request a Excel file, but if running from Node we just re-use the `demo.json` data.
- * 
+ *
  * @returns `string` being the `customXml\item1.xml` contents.
  */
 const requestFile = (): Promise<string> | undefined => {
@@ -89,7 +90,7 @@ const requestFile = (): Promise<string> | undefined => {
 
 /**
  * Requests the browser to download and save this Excel file.
- * 
+ *
  * @param buffer The data being downloaded.
  * @param type The mime-type of the file.
  * @param name The file name.
@@ -108,7 +109,7 @@ const downloadFile = (buffer: Buffer, type: string, name: string): void => {
 
 /**
  * Request the browser to save the Excel file to the computer.
- * 
+ *
  * @param excelZip The Excel file that was uploaded to the browser.
  * @returns `Promise<boolean>` if the request could be handled, along with the response being `true` if download succeeded, or `false` if it failed.
  */
@@ -139,7 +140,7 @@ const saveExcelZip = (
 
 /**
  * Request the browser to save the `customXml\item1.xml` contents back into the provided Excel file, then download the file.
- * 
+ *
  * @param xml `string` being the `customXml\item1.xml` contents.
  * @returns `Promise<boolean>` if the request could be handled, along with the response being `true` if download succeeded, or `false` if it failed.
  */
@@ -153,7 +154,7 @@ const saveFile = (xml: string): Promise<boolean> | undefined => {
 
 /**
  * If requested from a browser, the user is asked to upload a file, otherwise the `demo.json` data is used.
- * 
+ *
  * @returns `string` being the `customXml\item1.xml` contents.
  */
 export const getSampleXml = (): Promise<string> => {
@@ -164,7 +165,7 @@ export const getSampleXml = (): Promise<string> => {
 
 /**
  * If available, the returned data is the Excel file uploaded.
- * 
+ *
  * @returns `UnzippedExcel` or `undefined` depending if running via the browser.
  */
 export const getSampleExcelZip = (): UnzippedExcel | undefined => {
@@ -173,8 +174,8 @@ export const getSampleExcelZip = (): UnzippedExcel | undefined => {
 
 /**
  * Save the Excel file by downloading it. Only works in the browser.
- * 
- * @param excelZip 
+ *
+ * @param excelZip
  */
 export const saveSampleExcelZip = async (
     excelZip: UnzippedExcel
@@ -184,7 +185,7 @@ export const saveSampleExcelZip = async (
 
 /**
  * If requested from a browser, the user has their Excel file downloaded, otherwise the `customXml\item1.xml` content is printed to the terminal.
- * 
+ *
  * @param xml `string` being the `customXml\item1.xml` contents.
  */
 export const saveSampleXml = async (xml: string): Promise<void> => {
@@ -192,3 +193,54 @@ export const saveSampleXml = async (xml: string): Promise<void> => {
     if (success) return;
     console.log(xml);
 };
+
+const RunBrowserDemo = async (excelZip: UnzippedExcel): Promise<void> => {
+    const origFormula = excelZip.getFormula();
+    if (!origFormula) {
+        console.error('Unable to find formula.');
+        return;
+    }
+    const newFormula = origFormula.replace(
+        '"This is an example."',
+        '"This is the browser demonstration."'
+    );
+    excelZip.setFormula(newFormula);
+    await saveSampleExcelZip(excelZip);
+};
+
+const RunTerminalDemo = async (sampleXml: string): Promise<void> => {
+    const result = await ParseXml(sampleXml);
+    if (typeof result === 'string') {
+        console.error(result);
+        return;
+    }
+    const origFormula = result.getFormula();
+    if (!origFormula) {
+        console.error('Unable to find formula.');
+        return;
+    }
+    const newFormula = origFormula.replace(
+        '"This is an example."',
+        '"This is the terminal demonstration."'
+    );
+    result.setFormula(newFormula);
+    result.resetPermissions();
+    const binaryString = await result.save();
+    const newSampleXml = sampleXml.replace(
+        /">\s*(.*)\s*<\/DataMashup>\s*$/,
+        `">${binaryString}</DataMashup>`
+    );
+    await saveSampleXml(newSampleXml);
+};
+
+const RunDemo = async (): Promise<void> => {
+    const sampleXml = await getSampleXml();
+    const excelZip = getSampleExcelZip();
+    if (excelZip) {
+        RunBrowserDemo(excelZip);
+    } else {
+        RunTerminalDemo(sampleXml);
+    }
+};
+
+RunDemo();

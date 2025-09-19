@@ -1,5 +1,4 @@
-import type { UnzippedItem, UnzippedExcel } from '../types/index.d';
-
+import type { UnzippedItem, UnzippedExcel } from '.';
 import { Buffer } from './buffer';
 import { ParseXml } from './datamashup';
 import { ReadableStream } from './stream';
@@ -205,7 +204,7 @@ export const ExcelZip = async (
         const { result, file, xml } = datamashup;
         const binaryString = await result.save();
         const newXml = xml.replace(
-            /\"\>\s*(.*)\s*\<\/DataMashup\>\s*$/,
+            /">\s*(.*)\s*<\/DataMashup>\s*$/,
             `">${binaryString}</DataMashup>`
         );
         datamashup.xml = newXml;
