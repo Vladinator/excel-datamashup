@@ -1,6 +1,6 @@
 {
   "name": "excel-datamashup",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Read and edit the Power Query formula in Excel documents.",
   "type": "module",
   "main": "./dist/cjs/index.js",
@@ -15,7 +15,8 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.cjs.json",
-    "start": "npm run build"
+    "prepublishOnly": "npm run build",
+    "prepare": "npm run build"
   },
   "author": "Alex Pedersen",
   "license": "SEE LICENSE IN LICENSE",
