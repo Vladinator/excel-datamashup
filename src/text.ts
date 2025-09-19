@@ -1,20 +1,11 @@
 import { Buffer } from './buffer';
 
-let TextDecoderImpl = TextDecoder;
-let TextEncoderImpl = TextEncoder;
-
 /**
  * If the `TextDecoder` and `TextEncoder` is already available, it means we're running in the browser,
  * so we simply keep it. Otherwise, we load the Node util module.
  */
-if (
-    typeof TextDecoderImpl === 'undefined' ||
-    typeof TextEncoderImpl === 'undefined'
-) {
-    const { TextDecoder, TextEncoder } = require('node:util');
-    TextDecoderImpl = TextDecoder;
-    TextEncoderImpl = TextEncoder;
-}
+const TextDecoderImpl = TextDecoder || eval('require')('node:util').TextDecoder;
+const TextEncoderImpl = TextEncoder || eval('require')('node:util').TextEncoder;
 
 /**
  * Shared `UTF-8` encoder instance to help convert a `string` to `Uint8Array`.

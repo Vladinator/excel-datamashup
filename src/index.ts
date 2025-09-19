@@ -1,4 +1,3 @@
-export * from '.';
 export * from './buffer';
 export * from './datamashup';
 export * from './stream';
