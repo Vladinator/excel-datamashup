@@ -1,5 +1,6 @@
 import { Parser } from 'binary-parser';
 import { ExcelZip } from './excel';
+import type { Result } from './types';
 import { type UnzippedItem } from './zip';
 import {
     type IStringEncodingInfo,
@@ -34,7 +35,7 @@ export const MashupFormulaSectionDefault = 'Section1.m';
  *
  * https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-qdeff/d0959ba8-ac8d-4bee-bb58-9a869d7b226a
  */
-export const MashupPermissionDefaults = `<?xml version="1.0" encoding="utf-8"?>\r\n<PermissionList xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\r\n\t<CanEvaluateFuturePackages>false</CanEvaluateFuturePackages>\r\n\t<FirewallEnabled>true</FirewallEnabled>\r\n\t<WorkbookGroupType xsi:nil="true" />\r\n</PermissionList>`;
+const MashupPermissionDefaults = `<?xml version="1.0" encoding="utf-8"?>\r\n<PermissionList xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\r\n\t<CanEvaluateFuturePackages>false</CanEvaluateFuturePackages>\r\n\t<FirewallEnabled>true</FirewallEnabled>\r\n\t<WorkbookGroupType xsi:nil="true" />\r\n</PermissionList>`;
 
 /**
  * This struct matches the top-level binary stream.
@@ -43,7 +44,7 @@ export const MashupPermissionDefaults = `<?xml version="1.0" encoding="utf-8"?>\
  *
  * https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-qdeff/22557f6d-7c29-4554-8fe4-7b7a54ac7a2b
  */
-export const DataMashupRoot = new Parser()
+const DataMashupRoot = new Parser()
     .endianness('little')
     .uint32le('version')
     .uint32le('packagePartsLength')
@@ -65,7 +66,7 @@ export const DataMashupRoot = new Parser()
  *
  * https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-qdeff/778afc2c-02b2-4d91-aa30-52a6067b8cb9
  */
-export const DataMashupMetadata = new Parser()
+const DataMashupMetadata = new Parser()
     .endianness('little')
     .uint32le('version')
     .uint32le('metadataXmlLength')
@@ -73,78 +74,49 @@ export const DataMashupMetadata = new Parser()
     .uint32le('contentLength')
     .array('content', { type: 'uint8', length: 'contentLength' });
 
-export type IDataMashupRoot = ReturnType<(typeof DataMashupRoot)['parse']>;
+type IDataMashupRoot = ReturnType<(typeof DataMashupRoot)['parse']>;
 
-export type IDataMashupMetadata = ReturnType<
-    (typeof DataMashupMetadata)['parse']
->;
+type IDataMashupMetadata = ReturnType<(typeof DataMashupMetadata)['parse']>;
 
 export type IDataMashupResult = {
-    root: NonNullable<DataMashup['_root']>;
-    rootPerm: NonNullable<DataMashup['_rootPerm']>;
-    rootPermBind: NonNullable<DataMashup['_rootPermBind']>;
-    rootZip: NonNullable<DataMashup['_rootZip']>;
-    rootZipItems: NonNullable<DataMashup['_rootZipItems']>;
-    rootMeta: NonNullable<DataMashup['_rootMeta']>;
-    meta: NonNullable<DataMashup['_meta']>;
-    metaZip: NonNullable<DataMashup['_metaZip']>;
-    metaZipItems: NonNullable<DataMashup['_metaZipItems']>;
-    metaXml: NonNullable<DataMashup['_metaXml']>;
+    root: IDataMashupRoot;
+    rootPerm: Uint8Array;
+    rootPermBind: Uint8Array;
+    rootZip: ExcelZip;
+    rootMeta: Uint8Array;
+    meta: IDataMashupMetadata;
+    metaZip: ExcelZip;
+    metaXml: IStringEncodingInfo;
 };
 
 export class DataMashup {
     private readonly _mashup: Uint8Array;
-    private _root: IDataMashupRoot | undefined;
-    private _rootPerm: Uint8Array | undefined;
-    private _rootPermBind: Uint8Array | undefined;
-    private _rootZip: ExcelZip | undefined;
-    private _rootZipItems: UnzippedItem[] | undefined;
-    private _rootMeta: Uint8Array | undefined;
-    private _meta: IDataMashupMetadata | undefined;
-    private _metaZip: ExcelZip | undefined;
-    private _metaZipItems: UnzippedItem[] | undefined;
-    private _metaXml: IStringEncodingInfo | undefined;
+    private readonly _data: Partial<IDataMashupResult>;
     private _parse: Promise<IDataMashupResult> | undefined;
 
-    constructor(mashup: Uint8Array) {
+    private constructor(mashup: Uint8Array) {
         this._mashup = mashup;
+        this._data = {};
     }
 
-    private getResult(): IDataMashupResult {
-        const result: Partial<IDataMashupResult> = {
-            root: this._root,
-            rootPerm: this._rootPerm,
-            rootPermBind: this._rootPermBind,
-            rootZip: this._rootZip,
-            rootZipItems: this._rootZipItems || [],
-            rootMeta: this._rootMeta,
-            meta: this._meta,
-            metaZip: this._metaZip,
-            metaZipItems: this._metaZipItems || [],
-            metaXml: this._metaXml,
-        };
-        return result as IDataMashupResult;
+    public get data(): IDataMashupResult {
+        return this._data as IDataMashupResult;
     }
 
     private async parse(): Promise<IDataMashupResult> {
-        this._root = DataMashupRoot.parse(this._mashup as never);
-        this._rootPerm = Uint8ArrayUtils.from(this._root.permissions);
-        this._rootPermBind = Uint8ArrayUtils.from(
-            this._root.permissionBindings
-        );
-        this._rootZip = new ExcelZip(this._root.packageParts);
-        this._rootZipItems = await PromiseData(this._rootZip.unzip());
-        this._rootMeta = Uint8ArrayUtils.from(this._root.metadata);
-        this._meta = DataMashupMetadata.parse(this._rootMeta as never);
-        this._metaZip = new ExcelZip(this._meta.content);
-        this._metaZipItems = await PromiseData(this._metaZip.unzip());
-        this._metaXml = Uint8ArrayUtils.toStringEncoding(
-            this._meta.metadataXml
-        );
-        return this.getResult();
+        const { data } = this;
+        data.root = DataMashupRoot.parse(this._mashup as never); // Buffer extends Uint8Array, luckily the functionality added is not used by the `Parser`
+        data.rootPerm = Uint8ArrayUtils.from(data.root.permissions);
+        data.rootPermBind = Uint8ArrayUtils.from(data.root.permissionBindings);
+        data.rootZip = await ExcelZip.unzip(data.root.packageParts);
+        data.rootMeta = Uint8ArrayUtils.from(data.root.metadata);
+        data.meta = DataMashupMetadata.parse(data.rootMeta as never); // Buffer extends Uint8Array, luckily the functionality added is not used by the `Parser`
+        data.metaZip = await ExcelZip.unzip(data.meta.content);
+        data.metaXml = Uint8ArrayUtils.toStringEncoding(data.meta.metadataXml);
+        return data;
     }
 
-    public unpack(): Promise<IDataMashupResult> {
+    private unpack(): Promise<IDataMashupResult> {
         if (this._parse) {
             return this._parse;
         }
@@ -152,31 +124,32 @@ export class DataMashup {
         return this._parse;
     }
 
-    private async packRoot(
-        result: IDataMashupResult
-    ): Promise<Uint8Array | undefined> {
-        const metadata = await this.packMeta(result);
+    private async packRoot(): Promise<Uint8Array | undefined> {
+        const { data } = this;
+        const metadata = await this.packMeta();
         if (!metadata) {
             return;
         }
-        const packageParts = await PromiseData(result.rootZip.zip());
+        const packageParts = await PromiseData(data.rootZip.zip());
         if (!packageParts) {
             return;
         }
-        const permissions = result.rootPerm;
-        const permissionBindings = result.rootPermBind;
-        const version = result.root.version;
-        if (!packageParts || !metadata) {
-            return;
-        }
+        const permissions = data.rootPerm;
+        const permissionBindings = data.rootPermBind;
+        const version = data.root.version;
         const totalLength =
+            // version
             4 +
+            // packageParts
             4 +
             packageParts.length +
+            // permissions
             4 +
             permissions.length +
+            // metadata
             4 +
             metadata.length +
+            // permissionBindings
             4 +
             permissionBindings.length;
         const buffer = new ArrayBuffer(totalLength);
@@ -204,18 +177,25 @@ export class DataMashup {
         return array;
     }
 
-    private async packMeta(
-        result: IDataMashupResult
-    ): Promise<Uint8Array | undefined> {
-        const content = await PromiseData(result.metaZip.zip());
+    private async packMeta(): Promise<Uint8Array | undefined> {
+        const { data } = this;
+        const content = await PromiseData(data.metaZip.zip());
         if (!content) {
             return;
         }
         const metadataXml = Uint8ArrayUtils.fromStringEncodingInfo(
-            result.metaXml
+            data.metaXml
         );
-        const version = result.meta.version;
-        const totalLength = 4 + 4 + metadataXml.length + 4 + content.length;
+        const version = data.meta.version;
+        const totalLength =
+            // version
+            4 +
+            // metadataXml
+            4 +
+            metadataXml.length +
+            // content
+            4 +
+            content.length;
         const buffer = new ArrayBuffer(totalLength);
         const view = new DataView(buffer);
         const array = new Uint8Array(buffer);
@@ -235,16 +215,40 @@ export class DataMashup {
 
     public async pack(): Promise<Uint8Array | undefined> {
         await this.unpack();
-        const result = this.getResult();
-        const root = await this.packRoot(result);
-        return root;
+        const array = await this.packRoot();
+        return array;
+    }
+
+    public get rootItems(): UnzippedItem[] {
+        return this.data.rootZip.zipItems;
+    }
+
+    public get metaItems(): UnzippedItem[] {
+        return this.data.metaZip.zipItems;
+    }
+
+    public setFileContents(
+        item: UnzippedItem,
+        data: UnzippedItem['data']
+    ): Result<void> {
+        if (this.rootItems.some((o) => o === item)) {
+            return this.data.rootZip.setFileContents(item, data);
+        }
+        if (this.metaItems.some((o) => o === item)) {
+            return this.data.metaZip.setFileContents(item, data);
+        }
+        return { ok: false, error: 'File not found.' };
     }
 
     public resetPermissions(): void {
-        this._rootPerm = Uint8ArrayUtils.fromString(MashupPermissionDefaults);
+        this.data.rootPerm = Uint8ArrayUtils.fromString(
+            MashupPermissionDefaults
+        );
     }
 
-    public get items(): UnzippedItem[] | undefined {
-        return this._rootZipItems;
+    public static async unpack(mashup: Uint8Array): Promise<DataMashup> {
+        const instance = new this(mashup);
+        await instance.unpack();
+        return instance;
     }
 }

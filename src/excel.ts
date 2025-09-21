@@ -10,18 +10,14 @@ import { type UnzippedItem, Unzip, Zip } from './zip';
 
 export class ExcelCustomXml {
     private _xmlContent: string;
-    private readonly _datamashup: DataMashup;
+    private _datamashup: DataMashup;
 
-    public get xmlContent(): string {
-        return this._xmlContent;
-    }
-
-    public get mashupBase64(): string | undefined {
+    private get mashupBase64(): string | undefined {
         const match = this._xmlContent.match(MashupBinaryRegExp);
         return match ? match[1] : undefined;
     }
 
-    public set mashupBase64(value: string) {
+    private set mashupBase64(value: string) {
         if (!value) {
             return;
         }
@@ -38,18 +34,15 @@ export class ExcelCustomXml {
 
     private constructor(xmlContent: string) {
         this._xmlContent = xmlContent;
+        this._datamashup = undefined as never; // the static `create` ensures this is defined
+    }
+
+    private async unpack(): Promise<void> {
         const base64 = this.mashupBase64;
         const array = base64
             ? Uint8ArrayUtils.fromBase64(base64)
             : new Uint8Array();
-        this._datamashup = new DataMashup(array);
-    }
-
-    private async unpack(): Promise<void> {
-        if (!this._datamashup) {
-            return;
-        }
-        await this._datamashup.unpack();
+        this._datamashup = await DataMashup.unpack(array);
     }
 
     public async pack(): Promise<string | undefined> {
@@ -115,7 +108,8 @@ export class ZipFile {
             }
             const data = Uint8ArrayUtils.fromStringEncoding(
                 item.data,
-                item.encoding
+                item.encoding,
+                item.bom
             );
             return { ...item, data };
         });
@@ -150,14 +144,14 @@ export class ZipFile {
 
 export class ExcelZip extends ZipFile {
     private _mashupItem: UnzippedItem | null | undefined;
-    private _mashupInstance: Promise<ExcelCustomXml> | undefined;
+    private _mashup: Promise<ExcelCustomXml> | undefined;
     private _powerQueryItems: UnzippedItem[] | undefined;
 
     public get zipItems(): UnzippedItem[] {
         return super.zipItems || [];
     }
 
-    public get mashupItem(): UnzippedItem | undefined {
+    private get mashupItem(): UnzippedItem | undefined {
         if (this._mashupItem !== undefined) {
             return this._mashupItem || undefined;
         }
@@ -165,16 +159,16 @@ export class ExcelZip extends ZipFile {
         return this._mashupItem;
     }
 
-    public get mashupInstance(): Promise<ExcelCustomXml> | undefined {
-        if (this._mashupInstance) {
-            return this._mashupInstance;
+    public get mashup(): Promise<ExcelCustomXml> | undefined {
+        if (this._mashup) {
+            return this._mashup;
         }
         if (!this.mashupItem) {
             return undefined;
         }
         const data = this.mashupItem.data as string;
-        this._mashupInstance = ExcelCustomXml.create(data);
-        return this._mashupInstance;
+        this._mashup = ExcelCustomXml.create(data);
+        return this._mashup;
     }
 
     constructor(zipData: Uint8ArrayUtilsFrom) {
@@ -211,7 +205,7 @@ export class ExcelZip extends ZipFile {
             item = this.convertItemToString(item);
             data[i] = item;
         }
-        await this.mashupInstance;
+        await this.mashup;
         return {
             ok: true,
             data,
@@ -220,12 +214,12 @@ export class ExcelZip extends ZipFile {
 
     public async zip(): Promise<Result<Uint8Array>> {
         const mashupItem = this.mashupItem;
-        const mashupInstance = await this.mashupInstance;
-        if (!mashupItem || !mashupInstance) {
+        const mashup = await this.mashup;
+        if (!mashupItem || !mashup) {
             return super.zip();
         }
-        mashupInstance.datamashup.resetPermissions();
-        const xml = await mashupInstance.pack();
+        mashup.datamashup.resetPermissions();
+        const xml = await mashup.pack();
         if (!xml) {
             return {
                 ok: false,
@@ -257,11 +251,11 @@ export class ExcelZip extends ZipFile {
         if (this._powerQueryItems) {
             return this._powerQueryItems;
         }
-        const mashupInstance = await this.mashupInstance;
-        if (!mashupInstance) {
+        const mashup = await this.mashup;
+        if (!mashup) {
             return;
         }
-        const items = mashupInstance.datamashup.items;
+        const items = mashup.datamashup.rootItems;
         if (!items) {
             return;
         }
@@ -278,5 +272,22 @@ export class ExcelZip extends ZipFile {
             o.path.endsWith(MashupFormulaSectionDefault)
         );
         return item;
+    }
+
+    public async setPowerQueryFile(
+        item: UnzippedItem,
+        data: UnzippedItem['data']
+    ): Promise<void> {
+        const mashup = await this.mashup;
+        if (!mashup) {
+            return;
+        }
+        mashup.datamashup.setFileContents(item, data);
+    }
+
+    public static async unzip(zipData: Uint8ArrayUtilsFrom): Promise<ExcelZip> {
+        const instance = new this(zipData);
+        await instance.unzip();
+        return instance;
     }
 }
