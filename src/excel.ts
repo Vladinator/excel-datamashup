@@ -261,11 +261,11 @@ export class ExcelZip extends ZipFile {
         if (!mashupInstance) {
             return;
         }
-        const metaItems = mashupInstance.datamashup.metaItems;
-        if (!metaItems) {
+        const items = mashupInstance.datamashup.items;
+        if (!items) {
             return;
         }
-        this._powerQueryItems = metaItems.filter((o) => o.path.endsWith('.m'));
+        this._powerQueryItems = items.filter((o) => o.path.endsWith('.m'));
         return this._powerQueryItems;
     }
 

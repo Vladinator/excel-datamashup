@@ -244,7 +244,7 @@ export class DataMashup {
         this._rootPerm = Uint8ArrayUtils.fromString(MashupPermissionDefaults);
     }
 
-    public get metaItems(): UnzippedItem[] | undefined {
-        return this._metaZipItems;
+    public get items(): UnzippedItem[] | undefined {
+        return this._rootZipItems;
     }
 }
