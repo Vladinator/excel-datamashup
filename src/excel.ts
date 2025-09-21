@@ -1,81 +1,24 @@
-import { ParserMetadata, ParserRoot } from './datamashup';
+import {
+    DataMashup,
+    MashupBinaryPrefix,
+    MashupBinaryRegExp,
+    MashupFormulaSectionDefault,
+} from './datamashup';
 import type { Result } from './types';
 import { type Uint8ArrayUtilsFrom, Uint8ArrayUtils } from './utils';
 import { type UnzippedItem, Unzip, Zip } from './zip';
 
-/** Matching RegExp to extract the DataMashup XML tag and the base64 binary data. */
-const MashupBinaryRegExp = /<DataMashup[^>]*>(.*?)<\/DataMashup>/s;
-
-/** The string that signifies the DataMashup XML tag. */
-const MashupBinaryPrefix = '<DataMashup ';
-
-/**
- * The top-level binary stream has package parts, which is another ZIP archive with specific files.
- *
- * One of these is `Section1.m` which is a `Power Query Formula` following some strict rules.
- *
- * References:
- *
- * https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-qdeff/a4c2d0b9-9a9d-452d-8802-d68339374d57
- *
- * https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-qdeff/31e4aedb-e1ae-4ade-948c-1d377184fd52
- */
-const MashupFormulaSectionDefault = 'Section1.m';
-
-/**
- * If the top-level binary stream permission bindings become cryptographically invalid, then
- * we need to reset the permissions XML to this default to indicate that content has changed outside of Excel.
- *
- * References:
- *
- * https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-qdeff/d0959ba8-ac8d-4bee-bb58-9a869d7b226a
- */
-const MashupPermissionDefaults = `<?xml version="1.0" encoding="utf-8"?>\r\n<PermissionList xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\r\n\t<CanEvaluateFuturePackages>false</CanEvaluateFuturePackages>\r\n\t<FirewallEnabled>true</FirewallEnabled>\r\n\t<WorkbookGroupType xsi:nil="true" />\r\n</PermissionList>`;
-
-export type ExcelCustomXmlResult =
-    | 'NotParsed'
-    | 'DataMashupNotFound'
-    | 'Base64DecodeError'
-    | 'ParseRootError'
-    | 'MetadataError'
-    | 'Working'
-    | 'PackageUnzipError'
-    | 'MetadataUnzipError'
-    | 'Success';
-
-export type ExcelCustomXmlRootData = ReturnType<(typeof ParserRoot)['parse']>;
-
-export type ExcelCustomXmlMetadata = ReturnType<
-    (typeof ParserMetadata)['parse']
->;
-
 export class ExcelCustomXml {
     private _xmlContent: string;
-    private _parseResult: ExcelCustomXmlResult | undefined;
-    private _mashupBase64: string | null | undefined;
-    private _packageZip: ExcelZip | undefined;
-    private _rootData: ExcelCustomXmlRootData | undefined;
-    private _metaData: ExcelCustomXmlMetadata | undefined;
-    private _metaDataZip: ExcelZip | undefined;
-    private _metaDataXml:
-        | ReturnType<typeof Uint8ArrayUtils.toStringEncoding>
-        | undefined;
+    private readonly _datamashup: DataMashup;
 
-    public get parseResult(): ExcelCustomXmlResult {
-        return this._parseResult || 'NotParsed';
+    public get xmlContent(): string {
+        return this._xmlContent;
     }
 
     public get mashupBase64(): string | undefined {
-        if (this._mashupBase64 !== undefined) {
-            return this._mashupBase64 || undefined;
-        }
         const match = this._xmlContent.match(MashupBinaryRegExp);
-        if (!match) {
-            this._mashupBase64 = null;
-            return undefined;
-        }
-        this._mashupBase64 = match[1].trim();
-        return this._mashupBase64;
+        return match ? match[1] : undefined;
     }
 
     public set mashupBase64(value: string) {
@@ -83,138 +26,48 @@ export class ExcelCustomXml {
             return;
         }
         const current = this.mashupBase64;
-        if (!current) {
+        if (!current || current === value) {
             return;
         }
-        this._mashupBase64 = value;
         this._xmlContent = this._xmlContent.replace(current, value);
     }
 
-    public get packageItems(): UnzippedItem[] | undefined {
-        return this._packageZip && this._packageZip.zipItems;
+    public get datamashup(): DataMashup {
+        return this._datamashup;
     }
 
-    public get rootData(): ExcelCustomXmlRootData | undefined {
-        return this._rootData;
-    }
-
-    public get metaData(): ExcelCustomXmlMetadata | undefined {
-        return this._metaData;
-    }
-
-    public get metaDataItems(): UnzippedItem[] | undefined {
-        return this._metaDataZip && this._metaDataZip.zipItems;
-    }
-
-    public get metaDataXml(): string | undefined {
-        return this._metaDataXml && this._metaDataXml[0];
-    }
-
-    public set metaDataXml(value: string) {
-        if (!this._metaDataXml) {
-            return;
-        }
-        this._metaDataXml[0] = value;
-    }
-
-    constructor(xmlContent: string) {
+    private constructor(xmlContent: string) {
         this._xmlContent = xmlContent;
+        const base64 = this.mashupBase64;
+        const array = base64
+            ? Uint8ArrayUtils.fromBase64(base64)
+            : new Uint8Array();
+        this._datamashup = new DataMashup(array);
     }
 
-    public async parse(): Promise<void> {
-        if (this._parseResult) {
+    private async unpack(): Promise<void> {
+        if (!this._datamashup) {
             return;
         }
-        const mashupBase64 = this.mashupBase64;
-        if (!mashupBase64) {
-            this._parseResult = 'DataMashupNotFound';
-            return;
-        }
-        const mashupArray = Uint8ArrayUtils.fromBase64(mashupBase64);
-        if (!mashupArray) {
-            this._parseResult = 'Base64DecodeError';
-            return;
-        }
-        const rootData = ParserRoot.parse(mashupArray as never);
-        if (!rootData) {
-            this._parseResult = 'ParseRootError';
-            return;
-        }
-        this._parseResult = 'Working';
-        this._rootData = rootData;
-        this._packageZip = new ExcelZip(rootData.packageParts);
-        const packageUnzipResult = await this._packageZip.unzip();
-        if (!packageUnzipResult.ok) {
-            this._parseResult = 'PackageUnzipError';
-            return;
-        }
-        const metadataArray = Uint8ArrayUtils.from(rootData.metadata);
-        if (!metadataArray) {
-            this._parseResult = 'MetadataError';
-            return;
-        }
-        this._metaData = ParserMetadata.parse(metadataArray as never);
-        this._metaDataZip = new ExcelZip(this._metaData.content);
-        const metadataUnzipResult = await this._metaDataZip.unzip();
-        if (!metadataUnzipResult.ok) {
-            this._parseResult = 'MetadataUnzipError';
-            return;
-        }
-        this._metaDataXml = Uint8ArrayUtils.toStringEncoding(
-            this._metaData.metadataXml
-        );
-        this._parseResult = 'Success';
+        await this._datamashup.unpack();
     }
 
-    public resetPermissions(): void {
-        if (!this.rootData) {
+    public async pack(): Promise<string | undefined> {
+        if (!this._datamashup) {
             return;
         }
-        this.rootData.permissions = Uint8ArrayUtils.toNumberArray(
-            Uint8ArrayUtils.fromString(MashupPermissionDefaults)
-        );
+        const result = await this._datamashup.pack();
+        if (!result) {
+            return;
+        }
+        this.mashupBase64 = Uint8ArrayUtils.toBase64(result);
+        return this._xmlContent;
     }
 
-    public async save(): Promise<Result<string>> {
-        if (
-            !this.rootData ||
-            !this.metaData ||
-            !this._packageZip ||
-            !this._metaDataZip ||
-            !this._metaDataXml
-        ) {
-            return {
-                ok: false,
-                error: 'Unable to save because vital data is missing.',
-            };
-        }
-        const zipResult = await this._packageZip.zip();
-        if (!zipResult.ok) {
-            return zipResult;
-        }
-        const buffers: Uint8Array[] = [];
-        const { version, permissions, permissionBindings } = this.rootData;
-        Uint8ArrayUtils.appendInt32LE(buffers, version);
-        Uint8ArrayUtils.appendLenLE(buffers, zipResult.data);
-        Uint8ArrayUtils.appendLenLE(buffers, permissions);
-        Uint8ArrayUtils.appendMetadataLE(
-            buffers,
-            this._metaDataZip,
-            this.metaData,
-            Uint8ArrayUtils.fromStringEncoding(
-                this._metaDataXml[0],
-                this._metaDataXml[1],
-                this._metaDataXml[2]
-            )
-        );
-        Uint8ArrayUtils.appendLenLE(buffers, permissionBindings);
-        const buffer = Uint8ArrayUtils.concat(buffers);
-        const base64 = Uint8ArrayUtils.toBase64(buffer);
-        this.mashupBase64 = base64;
-        return {
-            ok: true,
-            data: this._xmlContent,
-        };
+    public static async create(xmlContent: string): Promise<ExcelCustomXml> {
+        const instance = new this(xmlContent);
+        await instance.unpack();
+        return instance;
     }
 }
 
@@ -297,7 +150,7 @@ export class ZipFile {
 
 export class ExcelZip extends ZipFile {
     private _mashupItem: UnzippedItem | null | undefined;
-    private _mashupInstance: ExcelCustomXml | undefined;
+    private _mashupInstance: Promise<ExcelCustomXml> | undefined;
     private _powerQueryItems: UnzippedItem[] | undefined;
 
     public get zipItems(): UnzippedItem[] {
@@ -312,7 +165,7 @@ export class ExcelZip extends ZipFile {
         return this._mashupItem;
     }
 
-    public get mashupInstance(): ExcelCustomXml | undefined {
+    public get mashupInstance(): Promise<ExcelCustomXml> | undefined {
         if (this._mashupInstance) {
             return this._mashupInstance;
         }
@@ -320,7 +173,7 @@ export class ExcelZip extends ZipFile {
             return undefined;
         }
         const data = this.mashupItem.data as string;
-        this._mashupInstance = new ExcelCustomXml(data);
+        this._mashupInstance = ExcelCustomXml.create(data);
         return this._mashupInstance;
     }
 
@@ -358,10 +211,7 @@ export class ExcelZip extends ZipFile {
             item = this.convertItemToString(item);
             data[i] = item;
         }
-        const mashupInstance = this.mashupInstance;
-        if (mashupInstance) {
-            await mashupInstance.parse();
-        }
+        await this.mashupInstance;
         return {
             ok: true,
             data,
@@ -370,17 +220,19 @@ export class ExcelZip extends ZipFile {
 
     public async zip(): Promise<Result<Uint8Array>> {
         const mashupItem = this.mashupItem;
-        const mashupInstance = this.mashupInstance;
+        const mashupInstance = await this.mashupInstance;
         if (!mashupItem || !mashupInstance) {
             return super.zip();
         }
-        await mashupInstance.parse();
-        mashupInstance.resetPermissions();
-        const saveResult = await mashupInstance.save();
-        if (!saveResult.ok) {
-            return saveResult;
+        mashupInstance.datamashup.resetPermissions();
+        const xml = await mashupInstance.pack();
+        if (!xml) {
+            return {
+                ok: false,
+                error: 'Unable to serialize CustomXml MashupData object.',
+            };
         }
-        const fileResult = this.setFileContents(mashupItem, saveResult.data);
+        const fileResult = this.setFileContents(mashupItem, xml);
         if (!fileResult.ok) {
             return fileResult;
         }
@@ -405,15 +257,26 @@ export class ExcelZip extends ZipFile {
         if (this._powerQueryItems) {
             return this._powerQueryItems;
         }
-        if (!this.mashupInstance) {
+        const mashupInstance = await this.mashupInstance;
+        if (!mashupInstance) {
             return;
         }
-        await this.mashupInstance.parse();
-        const items = this.mashupInstance.metaDataItems;
+        const metaItems = mashupInstance.datamashup.metaItems;
+        if (!metaItems) {
+            return;
+        }
+        this._powerQueryItems = metaItems.filter((o) => o.path.endsWith('.m'));
+        return this._powerQueryItems;
+    }
+
+    public async getPowerQueryFile(): Promise<UnzippedItem | undefined> {
+        const items = await this.getPowerQueryFiles();
         if (!items) {
             return;
         }
-        this._powerQueryItems = items.filter((o) => o.path.endsWith('.m'));
-        return this._powerQueryItems;
+        const item = items.find((o) =>
+            o.path.endsWith(MashupFormulaSectionDefault)
+        );
+        return item;
     }
 }

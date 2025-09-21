@@ -1,13 +1,16 @@
 import base64 from 'base64-js';
-import { type ExcelCustomXmlMetadata, ExcelZip } from './excel';
+import type { Result } from './types';
 
 /** The supported data types to convert into a `Uint8Array` which the `Uint8ArrayUtils.from` supports. */
 export type Uint8ArrayUtilsFrom = Uint8Array | number[];
 
+/** The supported data types to convert from a `Uint8Array` which the `Uint8ArrayUtils.to` supports. */
 export type Uint8ArrayUtilsTo = Uint8ArrayUtilsFrom | ArrayBuffer;
 
+/** Supported string encodings. */
 export type Uint8ArrayUtilsStringEncoding = 'utf-8' | 'utf-16le' | 'utf-16be';
 
+/** Map over supported string encodings. */
 const Uint8ArrayUtilsStringEncoding: Record<
     Uint8ArrayUtilsStringEncoding,
     Uint8ArrayUtilsStringEncoding
@@ -20,14 +23,24 @@ const Uint8ArrayUtilsStringEncoding: Record<
 /** In the browser environment this can only be `utf-8`. */
 const textEncoder = new TextEncoder();
 
+/** The default decoder is `utf-8`. */
 const textDecoder = new TextDecoder(Uint8ArrayUtilsStringEncoding['utf-8']);
 
+/** Additional decoders that we wish to decode, but also to be strict with when decoding. */
 const textDecoders = [
     new TextDecoder(Uint8ArrayUtilsStringEncoding['utf-8'], { fatal: true }),
     new TextDecoder(Uint8ArrayUtilsStringEncoding['utf-16le'], { fatal: true }),
     new TextDecoder(Uint8ArrayUtilsStringEncoding['utf-16be'], { fatal: true }),
 ];
 
+/** Used by `toStringEncoding` and `fromStringEncodingInfo` to convert strings back and forth as `Uint8Array` whilst keeping the correct encoding. */
+export type IStringEncodingInfo = [
+    string,
+    Uint8ArrayUtilsStringEncoding,
+    boolean
+];
+
+/** Collection of various data conversion from and to `Uint8Array`. */
 export class Uint8ArrayUtils {
     /** Convert any supported data type into `Uint8Array`. */
     public static from(data: Uint8ArrayUtilsFrom): Uint8Array {
@@ -50,6 +63,7 @@ export class Uint8ArrayUtils {
         return textEncoder.encode(data);
     }
 
+    /** Convert encoded string to `Uint8Array`. */
     public static fromStringEncoding(
         data: string | Uint8Array,
         encoding: Uint8ArrayUtilsStringEncoding,
@@ -74,11 +88,21 @@ export class Uint8ArrayUtils {
         }
     }
 
+    /** Convert encoded string to `Uint8Array`. */
+    public static fromStringEncodingInfo(
+        info: IStringEncodingInfo
+    ): Uint8Array {
+        const [data, encoding, addBOM] = info;
+        return this.fromStringEncoding(data, encoding, addBOM);
+    }
+
+    /** Convert data to base64 string. */
     public static toBase64(data: Uint8ArrayUtilsFrom): string {
         data = this.from(data);
         return base64.fromByteArray(data);
     }
 
+    /** Convert data to string. */
     public static toString(data: Uint8ArrayUtilsTo): string {
         if (!(data instanceof ArrayBuffer)) {
             data = this.from(data);
@@ -86,9 +110,10 @@ export class Uint8ArrayUtils {
         return textDecoder.decode(data);
     }
 
+    /** Convert data to string, but track its proper encoding and BOM status. */
     public static toStringEncoding(
         data: Uint8ArrayUtilsTo
-    ): [string, Uint8ArrayUtilsStringEncoding, boolean] {
+    ): IStringEncodingInfo {
         if (!(data instanceof ArrayBuffer)) {
             data = this.from(data);
         }
@@ -136,75 +161,7 @@ export class Uint8ArrayUtils {
         return data;
     }
 
-    /** Concat an array of `Uint8Array` into a flat `Uint8Array`. */
-    public static concat(arrays: Uint8Array[]): Uint8Array {
-        const totalLength = arrays.reduce((sum, arr) => sum + arr.length, 0);
-        const result = new Uint8Array(totalLength);
-        let offset = 0;
-        for (const array of arrays) {
-            result.set(array, offset);
-            offset += array.length;
-        }
-        return result;
-    }
-
-    public static append(
-        arrays: Uint8Array[],
-        value: Uint8ArrayUtilsFrom
-    ): void {
-        const array = this.from(value);
-        arrays.push(array);
-    }
-
-    public static appendInt32LE(arrays: Uint8Array[], value: number): void {
-        const arrayBuffer = new ArrayBuffer(4);
-        const view = new DataView(arrayBuffer);
-        view.setUint32(0, value, true);
-        const array = new Uint8Array(arrayBuffer);
-        arrays.push(array);
-    }
-
-    public static appendLE(
-        arrays: Uint8Array[],
-        value: string | number[] | Uint8Array
-    ): void {
-        if (typeof value === 'string') {
-            value = this.fromString(value);
-        }
-        const array = new Uint8Array(value.length);
-        array.set(value);
-        arrays.push(array);
-    }
-
-    public static appendLenLE(
-        arrays: Uint8Array[],
-        value: Uint8ArrayUtilsFrom
-    ): void {
-        const array = this.from(value);
-        this.appendInt32LE(arrays, array.length);
-        this.appendLE(arrays, array);
-    }
-
-    public static async appendMetadataLE(
-        arrays: Uint8Array[],
-        zip: ExcelZip,
-        metadata: ExcelCustomXmlMetadata,
-        metadataXmlArray: Uint8Array
-    ): Promise<void> {
-        const zipResult = await zip.zip();
-        if (!zipResult.ok) {
-            return;
-        }
-        const buffers: Uint8Array[] = [];
-        const { version } = metadata;
-        this.appendInt32LE(buffers, version);
-        this.appendLenLE(buffers, metadataXmlArray);
-        this.appendLenLE(buffers, zipResult.data);
-        const buffer = this.concat(buffers);
-        this.appendInt32LE(arrays, buffer.length);
-        this.append(arrays, buffer);
-    }
-
+    /** Convert string to `utf-16`, either `le` or `be` flavor, along with optional BOM. */
     private static encodeUTF16(
         data: string | Uint8ArrayUtilsFrom,
         isLe: boolean,
@@ -238,6 +195,7 @@ export class Uint8ArrayUtils {
         return buffer;
     }
 
+    /** Convert string to `utf-16le`. */
     public static encodeUTF16LE(
         data: string | Uint8ArrayUtilsFrom,
         addBOM?: boolean
@@ -245,6 +203,7 @@ export class Uint8ArrayUtils {
         return this.encodeUTF16(data, true, addBOM);
     }
 
+    /** Convert string to `utf-16be`. */
     public static encodeUTF16BE(
         data: string | Uint8ArrayUtilsFrom,
         addBOM?: boolean
@@ -252,3 +211,14 @@ export class Uint8ArrayUtils {
         return this.encodeUTF16(data, false, addBOM);
     }
 }
+
+/** Extract the underlying `data` prop for `Result` typed promises, otherwise the `Promise` value as-is. */
+export const PromiseData = async <T>(
+    promise: Promise<T | Result<T>>
+): Promise<T | undefined> => {
+    const result = await promise;
+    if (result && typeof result === 'object' && 'ok' in result) {
+        return result.ok ? result.data : undefined;
+    }
+    return result;
+};
