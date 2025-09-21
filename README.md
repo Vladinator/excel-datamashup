@@ -12,101 +12,75 @@ The goal of this project is to faciliate processing a Excel file, then being abl
 
 ## API
 
-You can work with the library in either ExcelZip mode which provides a certain level of wrapper for you.
+<details>
+  <summary>Directly editing `customXml\item1.xml` (DataMashup) using `ExcelCustomXml`.</summary>
 
 ```ts
-import { type UnzippedExcel, ExcelZip } from 'excel-datamashup';
+import { type UnzippedItem, ExcelCustomXml } from 'excel-datamashup';
 
-// read and store the binary zip data as number array, Uint8Array or Buffer
+const xml: string = '...';
+
+// returns a working instance of the class
+const excelXml: ExcelCustomXml = await ExcelCustomXml.create(xml);
+
+// find the power query file
+const powerQuery: UnzippedItem | undefined = excelXml.datamashup.rootItems.find(
+    (o) => o.path.endsWith('Section1.m')
+);
+
+// if found, set its contents to something else
+if (powerQuery) {
+    excelXml.datamashup.setFileContents(powerQuery, '...');
+
+    // always reset permissions when editing
+    await excelXml.datamashup.resetPermissions();
+}
+
+// pack the data back to a xml string, then write it back to the `customXml\item1.xml` file using your favorite zip editing library
+const newXml: string | undefined = await excelXml.pack();
+```
+
+</details>
+
+<details>
+  <summary>Editing an Excel xlsx file using `ExcelZip`.</summary>
+
+```ts
+import { type Result, ExcelZip, UnzippedItem } from 'excel-datamashup';
+
+// read and store the binary zip data as number array or Uint8Array
 const zip = new Uint8Array();
 
 // process the zip into a more manageable object
-const excelZip: UnzippedExcel = await ExcelZip(zip);
+const excelZip: ExcelZip = await ExcelZip.unzip(zip);
 
-// the object has some helper methods along with the raw data for manipulation
-const originalFormula: string = excelZip.getFormula();
+// get the power query contents
+const powerQuery: UnzippedItem | undefined = await excelZip.getPowerQueryFile();
 
-// modify or replace the formula entirely
-const newFormula: string = originalFormula.replace('"Some Text"', '"New Text"');
-
-// replace the formula with your new one
-// this method will also call the internal `excelZip.datamashup.result.resetPermissions()` method for you
-excelZip.setFormula(newFormula);
+// modify the power query contents
+if (powerQuery) {
+    await excelZip.setPowerQueryFile(
+        powerQuery,
+        'section Section1;\n\nshared Test = let\r\n    result = #table(1, {{"This is an example."}})\r\nin\r\n    result;'
+    );
+}
 
 // zip the contents back to an Excel file
-const newZip: Buffer = await excelZip.save();
+const result: Result<Uint8Array> = await excelZip.zip();
+
+// evaluate if it was successfull
+if (result.ok) {
+    console.log('Save the xlsx file:', result.data.length);
+} else {
+    console.log('Unable to create xlsx file.');
+}
 ```
 
-The more direct approach is to simply focus on processing the DataMashup XML file directly.
-
-```ts
-import { ParseXml } from 'excel-datamashup';
-
-// extract the contents of `customXml\item1.xml` using your favorite zip editing library
-const xml: string = `...`;
-
-// returns `ParseResult` object or a string corresponding to the `ParseError` type
-const result: ParseResult = await ParseXml(xml);
-
-// the object has some helper methods along with the raw data for manipulation
-const originalFormula: string = result.getFormula();
-
-// edit the original or create a entirely new power query
-const newFormula: string = `...`;
-
-// replace the formula with your new one
-result.setFormula(newFormula);
-
-// always reset permissions when editing
-result.resetPermissions();
-
-// update the contents of `customXml\item1.xml` by writing this new content using your favorite zip editing library
-const newXml: string = await result.save();
-```
+</details>
 
 ## Sample
 
-The sample folder contain an example file that contains a Power Query. It simply outputs text to a table.
-
-If you have this project checked out, simply uncomment the `src\index.ts` line 10 to enable the demo behavior.
-
-Build the project and run `dist\index.js` in a browser, it will ask for you to upload a Excel file, which it will edit then download.
-
-<details>
-  <summary>If you want to test using your own Excel file you can use the following PowerShell snippet to have it update `sample\excel.json` with your own Power Query.</summary>
-
-```pwsh
-$inputFile = ".\sample\demo.xlsb"
-$outputFile = ".\sample\demo.json"
-$zipName = "customXml/item1.xml"
-$tempFile = [System.IO.Path]::GetTempFileName()
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-$zip = [System.IO.Compression.ZipFile]::OpenRead($inputFile)
-try {
-    $entry = $zip.Entries | Where-Object { $_.FullName -eq $zipName }
-    $stream = $entry.Open()
-    try {
-        $reader = [IO.StreamReader]::new($stream)
-        $writer = [IO.StreamWriter]::new($tempFile)
-        try {
-            while (-not $reader.EndOfStream) {
-                $line = $reader.ReadLine()
-                $writer.WriteLine($line)
-            }
-        } finally {
-            $writer.Close()
-            $reader.Close()
-        }
-    } finally {
-        $stream.Close()
-    }
-} finally {
-    $zip.Dispose()
-}
-(Get-Content -Path $tempFile) -join "" | ConvertTo-Json -Compress | Set-Content -Path $outputFile
-Remove-Item -Path $tempFile
-```
-</details>
+The sample folder contain an example file that contains a Power Query, along with some additional sample code.
 
 ## Resources
 
